@@ -1,0 +1,33 @@
+import numpy as np
+import pandas as pd
+import matplotlib.pyplot as plt
+import warnings
+plt.style.use('seaborn')
+from tqdm import tqdm
+warnings.filterwarnings("ignore")
+
+PATH = "/content/NFLW2.csv"
+
+df = pd.read_csv("NFLW2.csv")
+
+FLEX = df.columns['RB', 'WR', 'TE']. #Need to define FLEX
+
+def active_players(roster):
+
+  theroster = pd.DataFrame(columns=["Player", "Pos", "Salary", "My Proj", "Own"])
+
+  for player in roster:
+    playerDict = {}
+    playerDict['Player'] = player.name
+    playerDict['Pos'] = player.position
+    playerDict['Salary'] = player.salary
+    playerDict['My Proj'] = player.projection
+    playerDict['Own'] = player.own
+    theroster = pd.concat([theroster[theroster['Pos'] == 'QB'].nlargest(1, ['My Proj']),\
+        theroster[theroster['Pos'] == 'RB'].nlargest(2, ['My Proj']),\
+        theroster[theroster['Pos'] == 'WR'].nlargest(3, ['My Proj']),\
+        theroster[theroster['Pos'] == 'TE'].nlargest(1, ['My Proj']),\
+        theroster[theroster['Pos'] == 'FLEX'].nlargest(1, ['My Proj']),\
+        theroster[theroster['Pos'] == 'DST'].nlargest(1, ['My Proj']),\
+
+    return theroster

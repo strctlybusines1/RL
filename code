@@ -12,22 +12,105 @@ df = pd.read_csv("NFLW2.csv")
 
 FLEX = df.columns['RB', 'WR', 'TE']. #Need to define FLEX
 
-def active_players(roster):
+availables = current[["player", "position", "salary", "points", "own"]].groupby(["player", "position", "salary", "points", "own"]).agg("count")
+availables = availables.reset_index()
+availables[availables.position=="QB"].head(15)
 
-  theroster = pd.DataFrame(columns=["Player", "Pos", "Salary", "My Proj", "Own"])
+salaries = {}
+points = {}
+for pos in availables.position.unique():
+    available_pos = availables[availables.position == pos]
+    salary = list(available_pos[["player","salary"]].set_index("player").to_dict().values())[0]
+    point = list(available_pos[["player","points"]].set_index("player").to_dict().values())[0]
+    salaries[pos] = salary
+    points[pos] = point
+pos_num_available = {
+    "QB": 1,
+    "RB": 2,
+    "WR": 3,
+    "TE": 1,
+    "FLEX": 1,
+    "DST": 1
+}
 
-  for player in roster:
-    playerDict = {}
-    playerDict['Player'] = player.name
-    playerDict['Pos'] = player.position
-    playerDict['Salary'] = player.salary
-    playerDict['My Proj'] = player.projection
-    playerDict['Own'] = player.own
-    theroster = pd.concat([theroster[theroster['Pos'] == 'QB'].nlargest(1, ['My Proj']),\
-        theroster[theroster['Pos'] == 'RB'].nlargest(2, ['My Proj']),\
-        theroster[theroster['Pos'] == 'WR'].nlargest(3, ['My Proj']),\
-        theroster[theroster['Pos'] == 'TE'].nlargest(1, ['My Proj']),\
-        theroster[theroster['Pos'] == 'FLEX'].nlargest(1, ['My Proj']),\
-        theroster[theroster['Pos'] == 'DST'].nlargest(1, ['My Proj']),\
+SALARY_CAP = 50000
 
-    return theroster
+class eps_bandit:
+    def __init__(self, k, eps, iter, mu='random'):
+      self.k = k
+      self.eps = eps
+      self.iters = iters
+      self.n = 0
+      self.k_n = np.zeros(k)
+      self.mean_reward = 0
+      self.reward = np.zeros(iters)
+      self.k_reward = np.zeros(k)
+
+      if type(mu) == list or type(mu).__module__ == np.__name__:
+        self.mu = np.array(mu)
+      elif mu == 'random':
+        self.mu = np.random.normal(0, 1, k)
+      elif mu == 'sequence':
+        self.mu = np.linspace(0, k-1, k)
+    
+    def pull(self):
+      p = np.random.rand()
+      if self.eps == 0 and self.n == 0:
+        a = np.random.choice(self.k)
+      elif p < self.eps:
+        a = np.random.choice(self.k)
+      else:
+        a = np.argmax(self.k_reward)
+
+      reward = np.random.normal(self.mu[a], 1)
+
+      self.n += 1
+      self.k_n[a] += 1
+
+      self.mean_reward = self.mean_reward + (reward - self.mean_reward) / self.n
+
+      self.k_reward[a] = self.k_reward[a] + (reward - self.k_reward[a]) / self.k_n[a]
+
+    def run(self):
+      for i in range(self.iters):
+        self.pull()
+        self.reward[i] = self.mean_reward
+
+    def reset(self):
+      self.n = 0
+      self.k_n = np.zeros(k)
+      self.mean_reward = 0
+      self.reward = np.zeros(iters)
+      self.k_reward = np.zeros(k)
+      
+      
+k = 9
+iters = 10000
+
+eps_0_rewards = np.zeros(iters)
+eps_01_rewards = np.zeros(iters)
+eps_1_rewards = np.zeros(iters)
+
+episodes = 10000
+for i in range(episodes):
+  eps_0 = eps_bandit(k, 0, iters)
+  eps_01 = eps_bandit(k, 0.01, iters, eps_0.mu.copy())
+  eps_1 = eps_bandit(k, 0.1, iters, eps_0.mu.copy())
+
+  eps_0.run()
+  eps_01.run()
+  eps_1.run()
+
+  eps_0_rewards = eps_0_rewards + (eps_0.reward - eps_0_rewards) / (i + 1)
+  eps_01_rewards = eps_01_rewards + (eps_01.reward - eps_01_rewards) / (i + 1)
+  eps_1_rewards = eps_1_rewards + (eps_1.reward - eps_1_rewards) / (i + 1)
+
+plt.figure(figsize=(12,8))
+plt.plot(eps_0_rewards, label="$\epsilon=0$ (greedy)")
+plt.plot(eps_01_rewards, label="$\epsilon=0.01$")
+plt.plot(eps_1_rewards, label="$\epsilon=0.1$")
+plt.legend(bbox_to_anchor=(1.3, 0.5))
+plt.xlabel("Iterations")
+plt.ylabel("Average Reward")
+plt.title("Average $\epsilon-greedy$ Rewards after " + str(episodes) + "Episodes")
+plt.show()
